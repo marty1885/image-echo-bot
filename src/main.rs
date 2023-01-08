@@ -87,7 +87,16 @@ impl EventHandler for Handler {
         let image_list_map = data.get_mut::<ImageListMap>().unwrap();
         let mut image_list = image_list_map.map.entry(key.clone()).or_insert(ImageList::new());
 
-        if msg.content == "!begin" {
+        if msg.content == "!debug" {
+            let mut bot_msg = String::from("```\n");
+            bot_msg += format!("ChannelID: {}, UserID: {}\n", msg.channel_id, msg.author.id).as_str();
+            bot_msg += format!("listening: {}, images: {}\n", image_list.listening, image_list.images.len()).as_str();
+            bot_msg += "```\n";
+            if let Err(why) = msg.channel_id.say(&ctx.http, bot_msg).await {
+                println!("Error sending message: {:?}", why);
+            }
+        }
+        else if msg.content == "!begin" {
             if image_list.listening {
                 if let Err(why) = msg.channel_id.say(&ctx.http, "Already listening").await {
                     println!("Error sending message: {:?}", why);
