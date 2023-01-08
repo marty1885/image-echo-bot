@@ -105,6 +105,9 @@ impl EventHandler for Handler {
             if let Err(why) = msg.channel_id.say(&ctx.http, bot_msg).await {
                 println!("Error sending message: {:?}", why);
             }
+            if image_list.images.len() == 0 {
+                image_list_map.map.remove(&key);
+            }
         }
         else if msg.content == "!begin" {
             if image_list.listening {
@@ -140,6 +143,7 @@ impl EventHandler for Handler {
             }
             // delete tmp file
             std::fs::remove_file(tmp_file).unwrap();
+            image_list_map.map.remove(&key);
         }
         else if image_list.listening {
             if image_list.images.len() > MAX_IMAGE_PER_SECTION {
