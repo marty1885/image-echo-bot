@@ -158,6 +158,38 @@ impl EventHandler for Handler {
                 }
             }
         }
+        else if msg.content.starts_with("!extract") {
+            let mut args = msg.content.split_whitespace();
+            args.next();
+            let message_url = args.next().unwrap();
+            let message_id = message_url.split('/').last().unwrap();
+            let channel_id = message_url.split('/').nth(5).unwrap();
+            let channel_id = ChannelId(channel_id.parse::<u64>().unwrap());
+            let message = channel_id.message(&ctx.http, message_id.parse::<u64>().unwrap()).await.unwrap();
+
+            let mut all_images = String::new();
+            for attachment in message.attachments {
+                let extension = attachment.filename.split('.').last().unwrap();
+                if IMGAE_EXTENSION.contains(extension) {
+                    all_images += &attachment.url;
+                    all_images += "\r\n";
+                }
+            }
+
+            let tmp_dir = tempdir().unwrap();
+            let tmp_file = tmp_dir.path().join(key.clone() + ".txt");
+            let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
+            file.write_all(all_images.as_bytes()).unwrap();
+            file.flush().unwrap();
+
+            let files = vec![tmp_file.as_path().to_str().unwrap()];
+            if let Err(why) = msg.channel_id.send_files(&ctx.http, files, |m| {
+                m.content("All images in that message")
+            }).await {
+                println!("Error sending message: {:?}", why);
+            }
+        }
+        
 
 
     }
