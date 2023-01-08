@@ -1,5 +1,7 @@
 
 use std::env;
+use std::io::Write;
+
 use std::collections::HashSet;
 use std::collections::HashMap;
 
@@ -9,7 +11,10 @@ extern crate lazy_static;
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::ChannelId;
 use serenity::prelude::*;
+
+use tempfile::tempdir;
 
 struct Handler;
 
@@ -118,18 +123,24 @@ impl EventHandler for Handler {
 
             image_list.listening = false;
             let mut all_images = String::new();
-            all_images += format!("Total {} images", image_list.images.len()).as_str();
-            all_images += "```";
             for image in image_list.images.iter() {
                 all_images += &image;
-            }
-            all_images += "```";
-            if let Err(why) = msg.channel_id.say(&ctx.http, all_images).await {
-                println!("Error sending message: {:?}", why);
+                all_images += "\r\n";
             }
 
-            image_list.images.clear();
-            image_list_map.map.remove(&key);
+            let tmp_dir = tempdir().unwrap();
+            let tmp_file = tmp_dir.path().join(key.clone() + ".txt");
+            let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
+            file.write_all(all_images.as_bytes()).unwrap();
+            file.flush().unwrap();
+
+            let files = vec![tmp_file.as_path().to_str().unwrap()];
+
+            if let Err(why) = msg.channel_id.send_files(&ctx.http, files, |m| {
+                m.content("Here are all the images you sent")
+            }).await {
+                println!("Error sending message: {:?}", why);
+            }
         }
         else if image_list.listening {
             if image_list.images.len() > MAX_IMAGE_PER_SECTION {
