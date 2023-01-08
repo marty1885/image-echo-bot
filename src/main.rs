@@ -68,6 +68,11 @@ lazy_static! {
 
 static MAX_IMAGE_PER_SECTION: usize = 500;
 
+fn save_string(strings: String, path: String) {
+    let mut file = std::fs::File::create(path).unwrap();
+    file.write_all(strings.as_bytes()).unwrap();
+}
+
 #[async_trait]
 impl EventHandler for Handler {
     // Set a handler for the `message` event - so that whenever a new message
@@ -122,25 +127,19 @@ impl EventHandler for Handler {
             }
 
             image_list.listening = false;
-            let mut all_images = String::new();
-            for image in image_list.images.iter() {
-                all_images += &image;
-                all_images += "\r\n";
-            }
-
+            let all_images = image_list.images.join("\r\n");
             let tmp_dir = tempdir().unwrap();
             let tmp_file = tmp_dir.path().join(key.clone() + ".txt");
-            let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
-            file.write_all(all_images.as_bytes()).unwrap();
-            file.flush().unwrap();
+            save_string(all_images, tmp_file.to_str().unwrap().to_string());
 
             let files = vec![tmp_file.as_path().to_str().unwrap()];
-
             if let Err(why) = msg.channel_id.send_files(&ctx.http, files, |m| {
                 m.content("Here are all the images you sent")
             }).await {
                 println!("Error sending message: {:?}", why);
             }
+            // delete tmp file
+            std::fs::remove_file(tmp_file).unwrap();
         }
         else if image_list.listening {
             if image_list.images.len() > MAX_IMAGE_PER_SECTION {
@@ -167,20 +166,11 @@ impl EventHandler for Handler {
             let channel_id = ChannelId(channel_id.parse::<u64>().unwrap());
             let message = channel_id.message(&ctx.http, message_id.parse::<u64>().unwrap()).await.unwrap();
 
-            let mut all_images = String::new();
-            for attachment in message.attachments {
-                let extension = attachment.filename.split('.').last().unwrap();
-                if IMGAE_EXTENSION.contains(extension) {
-                    all_images += &attachment.url;
-                    all_images += "\r\n";
-                }
-            }
+            let all_images = message.attachments.iter().map(|a| a.url.clone()).collect::<Vec<String>>().join("\r\n");
 
             let tmp_dir = tempdir().unwrap();
             let tmp_file = tmp_dir.path().join(key.clone() + ".txt");
-            let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
-            file.write_all(all_images.as_bytes()).unwrap();
-            file.flush().unwrap();
+            save_string(all_images, tmp_file.to_str().unwrap().to_string());
 
             let files = vec![tmp_file.as_path().to_str().unwrap()];
             if let Err(why) = msg.channel_id.send_files(&ctx.http, files, |m| {
@@ -188,6 +178,8 @@ impl EventHandler for Handler {
             }).await {
                 println!("Error sending message: {:?}", why);
             }
+            // delete tmp file
+            std::fs::remove_file(tmp_file).unwrap();
         }
         
 
